@@ -1,0 +1,50 @@
+config_temporal_datasets:
+  dataset_id: framework_temporal_views
+  project_id: peya-data-qlty-pro
+entities:
+- dataset:
+    table:
+      dataset_id: cl_hurrier
+      project_id: peya-data-origins-pro
+      table_id: orders
+      temporal_view_config:
+        materialized:
+          attributes:
+            clustering_fields:
+            - created_date
+            - country_code
+        query: ' SELECT DATE(DATETIME(created_at, timezone)) date_local, created_date,
+          upper(o.country_code) as country_code, o.platform_order_id, o.order_status,
+          o.order_value, TO_HEX (SHA256(CONCAT(o.country_code, o.order_id)) ) AS order_sk
+          FROM `peya-data-origins-pro.cl_hurrier.orders` o WHERE created_date >= DATE_SUB(CURRENT_DATE(),
+          INTERVAL 1 day) and o.country_code = "_country_code_" '
+        view_expiration_hours: 1
+  description: Verification of Completeness and Uniqueness of Logistics data in CL
+    Layer _country_code_
+  is_enable: true
+  is_testing: true
+  layer: CL
+  metadata:
+    country_code: _country_code_
+    owner: federico.rubinsztein@pedidosya.com
+  name: _country_code_ CL Logistics Orders Data Quality Check
+  validations:
+    metrics:
+    - arguments:
+      - value:
+          sql: ' SELECT country_code, order_id FROM `fulfillment-dwh-production.curated_data_shared.orders`
+            WHERE created_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 1 day) AND country_code
+            = "_country_code_" '
+      data_quality_dimension: completeness
+      description: Check differences between IL and CL Layers Orders Hurrier Data
+        from yesterday _country_code_
+      expectation: expect_table_row_count_to_equal
+      is_enable: true
+      name: _country_code_ DH Hurrier vs CL orders rows count check
+    name: orders
+file:
+  entities:
+  - orders
+  name: Logistics _country_code_
+  owner: carlos.jaime@pedidosya.com
+  team: Data-quality@pedidosya.com
